@@ -60,7 +60,6 @@ graph TD
 
 ### Prerequisites
 - Java 17+
-- Node.js 20+
 - Docker & Docker Compose
 
 ### 1. Backend Setup
