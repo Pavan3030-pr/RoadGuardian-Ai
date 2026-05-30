@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, AlertCircle, BrainCircuit, Send, Info, CheckCircle } from "lucide-react"
-import { createPublicAccident } from "../services/api"
+import { createPublicAccident, geocodeAddress } from "../services/api"
 import Card from "../components/Card"
 import Toast from "../components/Toast"
 import LoadingSpinner from "../components/LoadingSpinner"
@@ -18,7 +18,12 @@ const AccidentDetails = () => {
     description: "",
     casualties: 0,
     latitude: 0,
-    longitude: 0
+    longitude: 0,
+    area: "",
+    street: "",
+    village: "",
+    district: "",
+    state: "",
   })
 
   const pushToast = (message, type = "success") => {
@@ -38,10 +43,7 @@ const AccidentDetails = () => {
 
     setLoading(true)
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(formData.locationName)}`
-      )
-      const data = await response.json()
+      const data = await geocodeAddress(formData.locationName)
       if (data?.length) {
         const { lat, lon } = data[0]
         const address = data[0].address || {}
@@ -68,8 +70,8 @@ const AccidentDetails = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.latitude || !formData.longitude) {
-      pushToast("Please verify the location coordinates first", "error")
+    if (!Number(formData.latitude) || !Number(formData.longitude)) {
+      pushToast("Please verify the location or enter coordinates manually", "error")
       return
     }
 
@@ -77,6 +79,9 @@ const AccidentDetails = () => {
     try {
       const incident = await createPublicAccident({
         ...formData,
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude),
+        casualties: Number(formData.casualties || 0),
         title: `Public Report: ${formData.locationName}`,
         weatherCondition: "UNKNOWN",
         trafficDensity: "UNKNOWN",
@@ -211,6 +216,46 @@ const AccidentDetails = () => {
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-4 text-white outline-none focus:border-red-500 transition-colors"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Latitude</label>
+                  <input
+                    type="number"
+                    name="latitude"
+                    value={formData.latitude}
+                    onChange={handleInputChange}
+                    step="any"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-4 text-white outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Longitude</label>
+                  <input
+                    type="number"
+                    name="longitude"
+                    value={formData.longitude}
+                    onChange={handleInputChange}
+                    step="any"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-4 text-white outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {["street", "area", "village", "district", "state"].map(field => (
+                  <div key={field} className="space-y-2">
+                    <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">{field}</label>
+                    <input
+                      type="text"
+                      name={field}
+                      value={formData[field]}
+                      onChange={handleInputChange}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-4 text-white outline-none focus:border-red-500 transition-colors"
+                    />
+                  </div>
+                ))}
               </div>
 
               <div className="space-y-2">

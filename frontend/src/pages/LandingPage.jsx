@@ -483,7 +483,7 @@ export default function LandingPage() {
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.background = "rgba(0,212,255,0.08)" }}
               onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.background = "transparent" }}
             >
-              <Play size={16} fill="currentColor" /> Watch System Demo
+              <Play size={16} fill="currentColor" /> Open Live Console
             </button>
           </motion.div>
 
@@ -725,7 +725,7 @@ export default function LandingPage() {
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(255,26,46,0.55)" }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 0 30px rgba(255,26,46,0.4)" }}
                 >
-                  <Zap size={18} /> Request a Demo
+                  <Zap size={18} /> Contact Dispatch
                 </Link>
                 <button
                   className="inline-flex items-center justify-center gap-2 font-bold rounded-xl px-10 py-4 transition-all duration-300"

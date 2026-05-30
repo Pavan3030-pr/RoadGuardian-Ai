@@ -93,3 +93,8 @@ export const fetchAnalytics = async () => {
   const response = await api.get("/analytics/dashboard")
   return response.data.data
 }
+
+export const geocodeAddress = async (query) => {
+  const response = await api.get("/geocode/search", { params: { query } })
+  return response.data.data
+}

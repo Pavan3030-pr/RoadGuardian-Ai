@@ -24,7 +24,6 @@ ALTER TABLE emergency_responses ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
 ALTER TABLE emergency_responses ADD COLUMN IF NOT EXISTS vehicle_registration VARCHAR(50);
 
 ALTER TABLE live_tracking RENAME COLUMN heading TO direction;
-ALTER TABLE live_tracking RENAME COLUMN timestamp TO last_updated;
 ALTER TABLE live_tracking ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE ai_recommendations ADD COLUMN IF NOT EXISTS vehicles_detected INTEGER;

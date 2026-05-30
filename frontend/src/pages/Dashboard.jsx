@@ -2,10 +2,10 @@ import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Activity, MapPin, Clock, AlertTriangle, Shield, Truck,
-  HeartPulse, Plus, RefreshCcw, Zap, Users,
+  HeartPulse, RefreshCcw, Zap, Users,
 } from "lucide-react"
 import {
-  fetchActiveAccidents, fetchAccidentById, createPublicAccident,
+  fetchActiveAccidents, fetchAccidentById,
   dispatchAmbulance, notifyPolice, notifyHospital, fetchAnalytics,
 } from "../services/api"
 import Card from "../components/Card"
@@ -34,7 +34,6 @@ const Dashboard = () => {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
-  const [generating, setGenerating] = useState(false)
   const [dispatching, setDispatching] = useState({})
   const [wsStatus, setWsStatus] = useState("OFFLINE")
   const [analytics, setAnalytics] = useState(null)
@@ -45,10 +44,9 @@ const Dashboard = () => {
     if (!silent) setLoading(true)
     try {
       const data = await fetchActiveAccidents()
-      const metrics = await fetchAnalytics()
       const list = Array.isArray(data) ? data : []
       setAccidents(list)
-      setAnalytics(metrics)
+      fetchAnalytics().then(setAnalytics).catch(() => setAnalytics(null))
       if (list.length > 0) setSelected(prev => prev ? list.find(a => a.id === prev.id) || list[0] : list[0])
     } catch { pushToast("Unable to load incidents", "error") }
     finally { if (!silent) setLoading(false) }
@@ -86,34 +84,6 @@ const Dashboard = () => {
     finally { setDispatching(p => ({ ...p, [key]: false })) }
   }
 
-  const createDemo = async () => {
-    setGenerating(true)
-    try {
-      const loc = prompt("Enter accident location (City / Area)")
-      if (!loc?.trim()) return pushToast("Location required", "error")
-      const geo = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(loc)}`)
-      const geoData = await geo.json()
-      if (!geoData?.length) return pushToast("Location not found", "error")
-      const { lat, lon } = geoData[0]
-      const address = geoData[0].address || {}
-      const severities = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
-      const demo = await createPublicAccident({
-        title: `Accident at ${loc}`, description: "AI-detected collision. Emergency assistance recommended.",
-        latitude: parseFloat(lat), longitude: parseFloat(lon), locationName: loc,
-        street: address.road || address.neighbourhood || "", area: address.suburb || address.city_district || "",
-        village: address.village || address.town || address.city || "", district: address.state_district || address.county || "",
-        state: address.state || "",
-        severity: severities[Math.floor(Math.random() * severities.length)],
-        casualties: Math.floor(Math.random() * 5) + 1,
-        weatherCondition: "NORMAL", trafficDensity: "HIGH", roadType: "HIGHWAY",
-      })
-      setSelected(demo)
-      setAccidents(prev => [demo, ...prev.filter(a => a.id !== demo.id)])
-      pushToast(`Incident created at ${loc}`)
-    } catch { pushToast("Demo creation failed", "error") }
-    finally { setGenerating(false) }
-  }
-
   if (loading) return <LoadingSpinner fullScreen message="Initializing Command Center..." />
 
   return (
@@ -137,10 +107,6 @@ const Dashboard = () => {
         <div className="flex gap-2 shrink-0">
           <button onClick={() => loadAccidents()} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border border-slate-700 active:scale-95">
             <RefreshCcw size={16} /> Refresh
-          </button>
-          <button onClick={createDemo} disabled={generating} className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 active:scale-95">
-            {generating ? <RefreshCcw className="animate-spin" size={16} /> : <Plus size={16} />}
-            Add Demo
           </button>
         </div>
       </header>

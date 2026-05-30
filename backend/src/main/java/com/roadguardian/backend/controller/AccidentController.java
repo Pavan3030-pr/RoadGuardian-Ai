@@ -53,14 +53,6 @@ public class AccidentController {
 				.body(new ApiResponse<>(true, "Public accident reported successfully", response));
 	}
 
-	@PostMapping("/demo")
-	@Operation(summary = "Create demo accident", description = "Generate a demo accident for dashboard testing")
-	public ResponseEntity<ApiResponse<AccidentResponse>> createDemoAccident() {
-		AccidentResponse response = accidentService.createDemoAccident();
-		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(new ApiResponse<>(true, "Demo accident created successfully", response));
-	}
-
 	@GetMapping("/{id}")
 	@Operation(summary = "Get accident details", description = "Fetch accident information by ID")
 	public ResponseEntity<ApiResponse<AccidentResponse>> getAccident(@PathVariable Long id) {
@@ -124,7 +116,7 @@ public class AccidentController {
 	}
 
 	@PostMapping("/{id}/ambulance")
-	@PreAuthorize("hasAnyRole('ADMIN', 'POLICE')")
+	@PreAuthorize("isAuthenticated()")
 	@Operation(summary = "Dispatch ambulance", description = "Dispatch ambulance for accident")
 	public ResponseEntity<ApiResponse<String>> dispatchAmbulance(
 			@PathVariable Long id,
@@ -135,7 +127,7 @@ public class AccidentController {
 	}
 
 	@PostMapping("/{id}/police")
-	@PreAuthorize("hasAnyRole('ADMIN', 'POLICE')")
+	@PreAuthorize("isAuthenticated()")
 	@Operation(summary = "Notify police", description = "Notify local police for accident")
 	public ResponseEntity<ApiResponse<String>> notifyPolice(
 			@PathVariable Long id,
@@ -146,7 +138,7 @@ public class AccidentController {
 	}
 
 	@PostMapping("/{id}/hospital")
-	@PreAuthorize("hasAnyRole('ADMIN', 'POLICE')")
+	@PreAuthorize("isAuthenticated()")
 	@Operation(summary = "Notify hospital", description = "Notify hospital for accident")
 	public ResponseEntity<ApiResponse<String>> notifyHospital(
 			@PathVariable Long id,

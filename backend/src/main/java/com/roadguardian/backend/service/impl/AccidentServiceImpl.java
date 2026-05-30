@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -88,27 +89,6 @@ public class AccidentServiceImpl implements AccidentService {
 		notificationService.broadcastNewAccident(accident.getId(), accident.getLocationName());
 
 		return convertToResponse(accident);
-	}
-
-	public AccidentResponse createDemoAccident() {
-		CreateAccidentRequest demoRequest = CreateAccidentRequest.builder()
-				.title("Demo Accident Alert")
-				.description("A live demo accident created for emergency dispatch testing.")
-				.latitude(13.0827)
-				.longitude(80.2707)
-				.locationName("Chennai Demo Route")
-				.severity("HIGH")
-				.casualties(2)
-				.weatherCondition("RAINY")
-				.trafficDensity("HIGH")
-				.roadType("HIGHWAY")
-				.imageUrl("")
-				.videoUrl("")
-				.build();
-
-		AccidentResponse response = createAccident(demoRequest, null);
-		log.info("Demo accident created with ID: {}", response.getId());
-		return response;
 	}
 
 	public AccidentResponse updateAccident(Long accidentId, UpdateAccidentRequest request) {
@@ -521,7 +501,7 @@ public class AccidentServiceImpl implements AccidentService {
 								.firstName(firstName)
 								.lastName(lastName)
 								.email(email)
-								.password(passwordEncoder.encode("RoadGuardian123!"))
+								.password(passwordEncoder.encode(UUID.randomUUID().toString()))
 								.phone(phone)
 								.role(role)
 								.active(true)
@@ -562,7 +542,7 @@ public class AccidentServiceImpl implements AccidentService {
 						.firstName("Anonymous")
 						.lastName("Reporter")
 						.email("anonymous@roadguardian.ai")
-						.password(passwordEncoder.encode("RoadGuardian123!"))
+						.password(passwordEncoder.encode(UUID.randomUUID().toString()))
 						.phone("+919999999999")
 						.role(userRole)
 						.active(true)

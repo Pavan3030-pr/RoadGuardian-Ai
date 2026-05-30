@@ -13,7 +13,7 @@ CREATE INDEX idx_accidents_status_severity ON accidents(status, severity) WHERE 
 CREATE INDEX idx_users_auth ON users(email, active) WHERE deleted = false;
 
 -- 3. Live tracking historical analysis (ordered lookup)
-CREATE INDEX idx_tracking_composite ON live_tracking(user_id, accident_id, timestamp DESC);
+CREATE INDEX idx_tracking_composite ON live_tracking(user_id, accident_id, last_updated DESC);
 
 -- 4. Notification unread count for users
 CREATE INDEX idx_notifications_unread_user ON notifications(user_id, is_read) WHERE is_read = false;

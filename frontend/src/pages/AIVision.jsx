@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react"
+import { Link } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { Camera, Upload, Zap, Shield, RefreshCcw, CheckCircle, Square, Info, Activity } from "lucide-react"
 import api from "../services/api"
@@ -223,10 +224,9 @@ const AIVision = () => {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => pushToast("Incident report created")}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition-all border border-slate-700">
-                    Generate Report
-                  </button>
+                  <Link to="/accident" className="block w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition-all border border-slate-700 text-center">
+                    Open Incident Report
+                  </Link>
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}

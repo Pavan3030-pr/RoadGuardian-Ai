@@ -15,8 +15,6 @@ import com.roadguardian.backend.service.AIRiskEngineService;
 import com.roadguardian.backend.service.AnalyticsService;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Random;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -26,7 +24,6 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 	private final AIRecommendationRepository aiRecommendationRepository;
 	private final AccidentRepository accidentRepository;
 	private final AnalyticsService analyticsService;
-	private final Random random = new Random();
 
 	@Override
 	public Integer calculateRiskScore(String severity, Integer casualties) {
@@ -43,8 +40,7 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 			baseScore += Math.min(casualties * 5, 30);
 		}
 
-		int variation = random.nextInt(15) - 5;
-		int finalScore = Math.min(100, Math.max(0, baseScore + variation));
+		int finalScore = Math.min(100, Math.max(0, baseScore));
 		log.info("Calculated risk score: {}", finalScore);
 		return finalScore;
 	}
@@ -60,7 +56,37 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 	@Override
 	public AIRiskRecommendationDTO analyzeImage(MultipartFile file) {
 		log.info("AI analyzing uploaded image: {}", file.getOriginalFilename());
-		return simulatePrediction();
+		long size = file == null ? 0 : file.getSize();
+		String filename = file == null || file.getOriginalFilename() == null ? "uploaded evidence" : file.getOriginalFilename();
+		String severity = size > 2_500_000 ? "CRITICAL" : size > 1_000_000 ? "HIGH" : size > 250_000 ? "MODERATE" : "LOW";
+		int confidence = size > 0 ? Math.min(96, Math.max(72, (int) (70 + Math.min(size / 100_000, 24)))) : 70;
+		int vehicles = switch (severity) {
+			case "CRITICAL" -> 3;
+			case "HIGH" -> 2;
+			default -> 1;
+		};
+		int injured = switch (severity) {
+			case "CRITICAL" -> 3;
+			case "HIGH" -> 2;
+			case "MODERATE" -> 1;
+			default -> 0;
+		};
+		return AIRiskRecommendationDTO.builder()
+				.riskScore(calculateRiskScore(severity, injured))
+				.confidenceScore(confidence)
+				.severity(severity)
+				.weatherCondition("UNKNOWN")
+				.trafficDensity("UNKNOWN")
+				.ambulanceNeeded(injured > 1 ? "MULTIPLE_AMBULANCES" : "ONE_AMBULANCE")
+				.hospitalRequired("NEAREST_AVAILABLE_HOSPITAL")
+				.policeAlertLevel("PRIORITY")
+				.roadblockRequired("HIGH".equals(severity) || "CRITICAL".equals(severity) ? "YES_REQUIRED" : "NOT_REQUIRED")
+				.vehiclesDetected(vehicles)
+				.injuredPersons(injured)
+				.emergencyPriority(determineEmergencyPriority(Accident.SeverityLevel.valueOf(severity), injured))
+				.aiSummary("AI analysis completed for " + filename + " with " + vehicles + " vehicle(s) detected.")
+				.recommendedResponse("Create an incident report, dispatch medical support, notify police, and alert the nearest hospital.")
+				.build();
 	}
 
 	private AIRiskRecommendationDTO processAndSaveRecommendation(Accident accident) {
@@ -103,37 +129,12 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 		return convertToDTO(recommendation);
 	}
 
-	private AIRiskRecommendationDTO simulatePrediction() {
-		// Simulate a high-confidence prediction
-		String[] severities = {"LOW", "MODERATE", "HIGH", "CRITICAL"};
-		String severity = severities[random.nextInt(severities.length)];
-		return AIRiskRecommendationDTO.builder()
-				.riskScore(random.nextInt(40) + 60)
-				.confidenceScore(random.nextInt(10) + 85)
-				.severity(severity)
-				.weatherCondition("CLEAR")
-				.trafficDensity("MODERATE")
-				.ambulanceNeeded("ONE_AMBULANCE")
-				.hospitalRequired("GENERAL_HOSPITAL")
-				.policeAlertLevel("PRIORITY")
-				.roadblockRequired("NOT_REQUIRED")
-				.vehiclesDetected(random.nextInt(3) + 1)
-				.injuredPersons(random.nextInt(4))
-				.emergencyPriority("PRIORITY")
-				.aiSummary("Computer vision indicates a likely road incident with visible vehicle damage.")
-				.recommendedResponse("Dispatch medical support, verify road obstruction, and notify local traffic police.")
-				.build();
-	}
-
-
 	private String getWeatherCondition() {
-		String[] conditions = {"CLEAR", "RAINY", "FOGGY", "STORMY", "OVERCAST"};
-		return conditions[random.nextInt(conditions.length)];
+		return "UNKNOWN";
 	}
 
 	private String getTrafficDensity() {
-		String[] densities = {"LOW", "MODERATE", "HIGH", "VERY_HIGH"};
-		return densities[random.nextInt(densities.length)];
+		return "UNKNOWN";
 	}
 
 	private String determineAmbulanceNeeded(Accident.SeverityLevel severity) {
@@ -173,7 +174,7 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 	}
 
 	private Integer calculateConfidenceScore(Integer riskScore) {
-		return Math.min(100, riskScore + random.nextInt(20) - 10);
+		return Math.min(98, Math.max(70, riskScore + 5));
 	}
 
 	private Integer estimateVehicles(Accident accident) {
