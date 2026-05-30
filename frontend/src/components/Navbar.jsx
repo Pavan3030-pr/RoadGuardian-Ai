@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { Shield, LayoutDashboard, AlertCircle, Home, LogOut, LogIn, Eye, ShieldCheck } from "lucide-react"
+import { Shield, LayoutDashboard, AlertCircle, Home, LogOut, LogIn, Eye, ShieldCheck, FileText } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import NotificationCenter from "./NotificationCenter"
 
@@ -12,7 +12,8 @@ const Navbar = () => {
     { name: "Vision", path: "/vision", icon: <Eye size={18} /> },
     { name: "Admin", path: "/admin", icon: <ShieldCheck size={18} />, private: true, roles: ["ADMIN"] },
     { name: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} />, private: true },
-    { name: "Reports", path: "/accident", icon: <AlertCircle size={18} /> },
+    { name: "Reports", path: "/reports", icon: <FileText size={18} />, private: true },
+    { name: "Incidents", path: "/accident", icon: <AlertCircle size={18} /> },
   ]
 
   const visibleNavItems = navItems.filter(item => {
