@@ -408,6 +408,7 @@ public class AccidentServiceImpl implements AccidentService {
 						.lastName("Reporter")
 						.email("anonymous@roadguardian.ai")
 						.password(passwordEncoder.encode("RoadGuardian123!"))
+						.phone("+919999999999")
 						.role(userRole)
 						.active(true)
 						.emailVerified(true)

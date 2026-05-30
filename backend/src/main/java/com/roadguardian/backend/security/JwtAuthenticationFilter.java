@@ -44,6 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
 				String email = jwtTokenProvider.getEmailFromJWT(jwt);
 				List<String> roles = jwtTokenProvider.getRolesFromJWT(jwt);
+				UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
 				if (roles != null) {
 					List<SimpleGrantedAuthority> authorities = roles.stream()
@@ -51,11 +52,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 							.collect(Collectors.toList());
 
 					Authentication authentication = new UsernamePasswordAuthenticationToken(
-							email, null, authorities);
+							userDetails, null, authorities);
 					SecurityContextHolder.getContext().setAuthentication(authentication);
 				} else {
 					// Fallback to DB if roles are missing from token
-					UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 					Authentication authentication = new UsernamePasswordAuthenticationToken(
 							userDetails, null, userDetails.getAuthorities());
 					SecurityContextHolder.getContext().setAuthentication(authentication);

@@ -11,6 +11,7 @@ import com.roadguardian.backend.model.dto.request.LoginRequest;
 import com.roadguardian.backend.model.dto.request.RegisterRequest;
 import com.roadguardian.backend.model.dto.response.JwtAuthResponse;
 import com.roadguardian.backend.model.dto.response.ApiResponse;
+import com.roadguardian.backend.model.dto.response.UserResponse;
 import com.roadguardian.backend.service.AuthService;
 
 import jakarta.validation.Valid;
@@ -54,7 +55,7 @@ public class AuthController {
 
 	@GetMapping("/me")
 	@Operation(summary = "Get current user", description = "Fetch current logged-in user details")
-	public ResponseEntity<ApiResponse<Object>> getCurrentUser() {
-		return ResponseEntity.ok(new ApiResponse<>(true, "Current user fetched", authService.getCurrentUser()));
+	public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser() {
+		return ResponseEntity.ok(new ApiResponse<>(true, "Current user fetched", authService.getCurrentUserResponse()));
 	}
 }

@@ -164,14 +164,17 @@ public class AuthService {
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-		RefreshToken token = refreshTokenRepository.findByUser(user).orElse(null);
-		if (token != null) {
+		refreshTokenRepository.findAllByUserAndRevokedFalse(user).forEach(token -> {
 			token.setRevoked(true);
 			token.setRevokedAt(LocalDateTime.now());
 			refreshTokenRepository.save(token);
-		}
+		});
 
 		log.info("User {} logged out", user.getEmail());
+	}
+
+	public UserResponse getCurrentUserResponse() {
+		return convertToUserResponse(getCurrentUser());
 	}
 
 	public User getCurrentUser() {
@@ -186,9 +189,10 @@ public class AuthService {
 	}
 
 	private RefreshToken createRefreshToken(User user) {
-		// Revoke existing tokens
-		refreshTokenRepository.findByUser(user).ifPresent(token -> {
+		// Revoke existing active tokens before rotating.
+		refreshTokenRepository.findAllByUserAndRevokedFalse(user).forEach(token -> {
 			token.setRevoked(true);
+			token.setRevokedAt(LocalDateTime.now());
 			refreshTokenRepository.save(token);
 		});
 
