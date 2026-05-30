@@ -44,6 +44,16 @@ public class Accident {
     @Column(name = "location_name", nullable = false)
     private String locationName;
 
+    private String area;
+
+    private String street;
+
+    private String village;
+
+    private String district;
+
+    private String state;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SeverityLevel severity;
@@ -111,7 +121,22 @@ public class Accident {
     }
 
     public enum IncidentStatus {
-        REPORTED, ACKNOWLEDGED, IN_PROGRESS, DISPATCHED, ESCALATED, RESOLVED, CANCELLED
+        ACCIDENT_DETECTED,
+        AI_VERIFIED,
+        AMBULANCE_ASSIGNED,
+        POLICE_ASSIGNED,
+        HOSPITAL_ALERTED,
+        AMBULANCE_ARRIVED,
+        PATIENT_PICKED,
+        REACHED_HOSPITAL,
+        CASE_CLOSED,
+        REPORTED,
+        ACKNOWLEDGED,
+        IN_PROGRESS,
+        DISPATCHED,
+        ESCALATED,
+        RESOLVED,
+        CANCELLED
     }
 
     public enum WeatherCondition {

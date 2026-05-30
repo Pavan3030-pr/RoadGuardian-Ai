@@ -27,6 +27,13 @@ const createResponderIcon = (color) => L.divIcon({
   iconAnchor: [6, 6],
 })
 
+const createHospitalIcon = () => L.divIcon({
+  className: "",
+  html: `<div style="width:18px;height:18px;border-radius:4px;background:#10b981;border:2px solid white;display:grid;place-items:center;color:white;font-weight:900;font-size:12px;box-shadow:0 0 10px #10b98166">H</div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+})
+
 const LiveMap = ({ accidents = [], selectedAccident, onSelectAccident }) => {
   const mapEl = useRef(null)
   const mapRef = useRef(null)
@@ -123,24 +130,38 @@ const LiveMap = ({ accidents = [], selectedAccident, onSelectAccident }) => {
 
     const responders = []
     if (selectedAccident.ambulanceAssigned)
-      responders.push({ offset: [0.015, 0.015], color: "#ef4444", label: "Medical Unit" })
+      responders.push({
+        pos: [
+          selectedAccident.ambulanceLatitude || selectedAccident.latitude + 0.015,
+          selectedAccident.ambulanceLongitude || selectedAccident.longitude + 0.015
+        ],
+        color: "#ef4444",
+        label: `Ambulance · ${selectedAccident.currentResponderStatus || "DISPATCHED"} · ETA ${selectedAccident.etaMinutes ?? "--"}m`
+      })
     if (selectedAccident.policeAssigned)
-      responders.push({ offset: [-0.015, -0.015], color: "#94a3b8", label: "Police Unit" })
+      responders.push({ pos: [selectedAccident.latitude - 0.015, selectedAccident.longitude - 0.015], color: "#94a3b8", label: "Police Unit" })
 
     if (responders.length > 0) {
       const lines = []
       responders.forEach(r => {
-        const pos = [selectedAccident.latitude + r.offset[0], selectedAccident.longitude + r.offset[1]]
-        const m = L.marker(pos, { icon: createResponderIcon(r.color) })
+        const m = L.marker(r.pos, { icon: createResponderIcon(r.color) })
           .addTo(map)
           .bindPopup(`<b>${r.label}</b>`)
         responderMarkersRef.current.push(m)
-        lines.push(pos)
+        lines.push(r.pos)
       })
       routeRef.current = L.polyline(
         lines.map(p => [p, [selectedAccident.latitude, selectedAccident.longitude]]).flat(),
         { color: "#60a5fa", weight: 2, dashArray: "6 8", opacity: 0.7 }
       ).addTo(map)
+    }
+
+    if (selectedAccident.hospitalAssigned) {
+      const pos = [selectedAccident.latitude + 0.025, selectedAccident.longitude - 0.02]
+      const marker = L.marker(pos, { icon: createHospitalIcon() })
+        .addTo(map)
+        .bindPopup(`<b>${selectedAccident.hospitalAssigned.firstName} ${selectedAccident.hospitalAssigned.lastName}</b>`)
+      responderMarkersRef.current.push(marker)
     }
   }, [selectedAccident])
 

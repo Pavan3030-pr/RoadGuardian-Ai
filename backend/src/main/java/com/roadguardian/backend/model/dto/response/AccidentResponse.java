@@ -21,6 +21,16 @@ public class AccidentResponse {
 
     private String locationName;
 
+    private String area;
+
+    private String street;
+
+    private String village;
+
+    private String district;
+
+    private String state;
+
     private String severity;
 
     private String status;
@@ -32,6 +42,18 @@ public class AccidentResponse {
     private String imageUrl;
 
     private String videoUrl;
+
+    private AIAnalysisResponse aiAnalysis;
+
+    private java.util.List<ProgressEventResponse> progressTimeline;
+
+    private String currentResponderStatus;
+
+    private Integer etaMinutes;
+
+    private Double ambulanceLatitude;
+
+    private Double ambulanceLongitude;
 
     private UserResponse reportedBy;
 
@@ -52,4 +74,28 @@ public class AccidentResponse {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class AIAnalysisResponse {
+        private String severity;
+        private Integer confidenceScore;
+        private Integer vehiclesDetected;
+        private Integer injuredPersons;
+        private String emergencyPriority;
+        private String aiSummary;
+        private String recommendedResponse;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ProgressEventResponse {
+        private String status;
+        private LocalDateTime timestamp;
+        private String detail;
+    }
 }

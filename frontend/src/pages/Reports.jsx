@@ -15,7 +15,12 @@ const SEVERITY_VARIANT = { CRITICAL: "danger", HIGH: "danger", MODERATE: "warnin
 const STATUS_VARIANT = {
   RESOLVED: "success", CANCELLED: "default",
   REPORTED: "danger", ACKNOWLEDGED: "warning",
-  IN_PROGRESS: "warning", DISPATCHED: "info", ESCALATED: "danger"
+  IN_PROGRESS: "warning", DISPATCHED: "info", ESCALATED: "danger",
+  ACCIDENT_DETECTED: "danger", AI_VERIFIED: "info",
+  AMBULANCE_ASSIGNED: "warning", POLICE_ASSIGNED: "warning",
+  HOSPITAL_ALERTED: "info", AMBULANCE_ARRIVED: "success",
+  PATIENT_PICKED: "success", REACHED_HOSPITAL: "success",
+  CASE_CLOSED: "success"
 }
 
 const fmt = (v) =>
@@ -90,9 +95,9 @@ const Reports = () => {
       if (statusFilter === "critical") {
         result = result.filter(i => i.severity === "CRITICAL" || i.severity === "HIGH")
       } else if (statusFilter === "resolved") {
-        result = result.filter(i => i.status === "RESOLVED")
+        result = result.filter(i => i.status === "RESOLVED" || i.status === "CASE_CLOSED")
       } else if (statusFilter === "pending") {
-        result = result.filter(i => !["RESOLVED", "CANCELLED"].includes(i.status))
+        result = result.filter(i => !["RESOLVED", "CASE_CLOSED", "CANCELLED"].includes(i.status))
       }
     }
 
@@ -119,8 +124,8 @@ const Reports = () => {
   const stats = {
     total: totalElements,
     critical: incidents.filter(i => i.severity === "CRITICAL").length,
-    resolved: incidents.filter(i => i.status === "RESOLVED").length,
-    pending: incidents.filter(i => !["RESOLVED", "CANCELLED"].includes(i.status)).length,
+    resolved: incidents.filter(i => i.status === "RESOLVED" || i.status === "CASE_CLOSED").length,
+    pending: incidents.filter(i => !["RESOLVED", "CASE_CLOSED", "CANCELLED"].includes(i.status)).length,
   }
 
   return (

@@ -41,6 +41,18 @@ public class AIRecommendation {
 
 	private Integer confidenceScore;
 
+	private Integer vehiclesDetected;
+
+	private Integer injuredPersons;
+
+	private String emergencyPriority;
+
+	@Column(columnDefinition = "TEXT")
+	private String aiSummary;
+
+	@Column(columnDefinition = "TEXT")
+	private String recommendedResponse;
+
 	@CreationTimestamp
 	@Column(nullable = false, updatable = false)
 	private LocalDateTime createdAt;

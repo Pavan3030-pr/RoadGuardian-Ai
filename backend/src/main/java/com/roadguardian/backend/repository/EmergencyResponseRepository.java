@@ -9,9 +9,12 @@ import java.util.List;
 @Repository
 public interface EmergencyResponseRepository extends JpaRepository<EmergencyResponse, Long> {
 	List<EmergencyResponse> findByAccidentId(Long accidentId);
+	List<EmergencyResponse> findByAccidentIdOrderByCreatedAtAsc(Long accidentId);
 	List<EmergencyResponse> findByResponderId(Long userId);
 	    List<EmergencyResponse> findByResponseTypeAndStatus(
 		    EmergencyResponse.ResponseType responseType,
 		    EmergencyResponse.ResponseStatus status
 	    );
+	Long countByResponseType(EmergencyResponse.ResponseType responseType);
+	Long countByStatusNot(EmergencyResponse.ResponseStatus status);
 }

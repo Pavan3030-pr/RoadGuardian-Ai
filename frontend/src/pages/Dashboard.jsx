@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 import {
   fetchActiveAccidents, fetchAccidentById, createPublicAccident,
-  dispatchAmbulance, notifyPolice, notifyHospital,
+  dispatchAmbulance, notifyPolice, notifyHospital, fetchAnalytics,
 } from "../services/api"
 import Card from "../components/Card"
 import Badge from "../components/Badge"
@@ -17,6 +17,17 @@ import LiveMap from "../components/LiveMap"
 const fmt = (v) => v ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(v)) : "--"
 
 const SEVERITY_VARIANT = { CRITICAL: "danger", HIGH: "danger", MODERATE: "warning", LOW: "info" }
+const STATUS_VARIANT = {
+  ACCIDENT_DETECTED: "danger",
+  AI_VERIFIED: "info",
+  AMBULANCE_ASSIGNED: "warning",
+  POLICE_ASSIGNED: "warning",
+  HOSPITAL_ALERTED: "info",
+  AMBULANCE_ARRIVED: "success",
+  PATIENT_PICKED: "success",
+  REACHED_HOSPITAL: "success",
+  CASE_CLOSED: "success",
+}
 
 const Dashboard = () => {
   const [accidents, setAccidents] = useState([])
@@ -26,6 +37,7 @@ const Dashboard = () => {
   const [generating, setGenerating] = useState(false)
   const [dispatching, setDispatching] = useState({})
   const [wsStatus, setWsStatus] = useState("OFFLINE")
+  const [analytics, setAnalytics] = useState(null)
 
   const pushToast = (message, type = "success") => setToast({ message, type })
 
@@ -33,8 +45,10 @@ const Dashboard = () => {
     if (!silent) setLoading(true)
     try {
       const data = await fetchActiveAccidents()
+      const metrics = await fetchAnalytics()
       const list = Array.isArray(data) ? data : []
       setAccidents(list)
+      setAnalytics(metrics)
       if (list.length > 0) setSelected(prev => prev ? list.find(a => a.id === prev.id) || list[0] : list[0])
     } catch { pushToast("Unable to load incidents", "error") }
     finally { if (!silent) setLoading(false) }
@@ -77,14 +91,18 @@ const Dashboard = () => {
     try {
       const loc = prompt("Enter accident location (City / Area)")
       if (!loc?.trim()) return pushToast("Location required", "error")
-      const geo = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(loc)}`)
+      const geo = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(loc)}`)
       const geoData = await geo.json()
       if (!geoData?.length) return pushToast("Location not found", "error")
       const { lat, lon } = geoData[0]
+      const address = geoData[0].address || {}
       const severities = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
       const demo = await createPublicAccident({
         title: `Accident at ${loc}`, description: "AI-detected collision. Emergency assistance recommended.",
         latitude: parseFloat(lat), longitude: parseFloat(lon), locationName: loc,
+        street: address.road || address.neighbourhood || "", area: address.suburb || address.city_district || "",
+        village: address.village || address.town || address.city || "", district: address.state_district || address.county || "",
+        state: address.state || "",
         severity: severities[Math.floor(Math.random() * severities.length)],
         casualties: Math.floor(Math.random() * 5) + 1,
         weatherCondition: "NORMAL", trafficDensity: "HIGH", roadType: "HIGHWAY",
@@ -112,9 +130,9 @@ const Dashboard = () => {
             </Badge>
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Command <span className="text-red-500">Center</span>
+            Dispatcher <span className="text-red-500">Console</span>
           </h1>
-          <p className="text-sm text-slate-400">Monitor incidents, coordinate emergency responses, analyze risk.</p>
+          <p className="text-sm text-slate-400">Assign responders, track active incidents, and monitor unit status.</p>
         </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => loadAccidents()} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border border-slate-700 active:scale-95">
@@ -131,9 +149,9 @@ const Dashboard = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Active Incidents", value: accidents.length, icon: <AlertTriangle size={18} />, color: "text-red-400", bg: "bg-red-500/10" },
-          { label: "Resolved Today", value: "12", icon: <Shield size={18} />, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "Dispatched Units", value: "08", icon: <Truck size={18} />, color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "Avg Response", value: "4.2m", icon: <Clock size={18} />, color: "text-amber-400", bg: "bg-amber-500/10" },
+          { label: "Closed Cases", value: analytics?.resolvedCases ?? 0, icon: <Shield size={18} />, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "Dispatched Units", value: analytics?.totalEmergencyResponses ?? 0, icon: <Truck size={18} />, color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "Avg Response", value: `${Number(analytics?.averageResponseTime || 0).toFixed(1)}m`, icon: <Clock size={18} />, color: "text-amber-400", bg: "bg-amber-500/10" },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
@@ -177,17 +195,49 @@ const Dashboard = () => {
                       <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Severity</p>
                       <Badge variant={SEVERITY_VARIANT[selected.severity] || "default"}>{selected.severity}</Badge>
                     </div>
-                    <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Casualties</p>
+                  <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Injured Persons</p>
                       <div className="flex items-center gap-1.5 text-white font-bold">
-                        <Users size={14} className="text-slate-400" /> {selected.casualties || 0}
+                        <Users size={14} className="text-slate-400" /> {selected.aiAnalysis?.injuredPersons ?? selected.casualties ?? 0}
                       </div>
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Confidence Score</p>
+                      <p className="text-white font-bold">{selected.aiAnalysis?.confidenceScore ?? "--"}%</p>
+                    </div>
+                    <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Vehicles Detected</p>
+                      <p className="text-white font-bold">{selected.aiAnalysis?.vehiclesDetected ?? "--"}</p>
+                    </div>
+                  </div>
                   <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4">
+                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-2">AI Summary</p>
                     <p className="text-xs text-slate-300 leading-relaxed italic line-clamp-4">
-                      "{selected.description || "No AI analysis available for this sector."}"
+                      "{selected.aiAnalysis?.aiSummary || selected.description || "No AI analysis available for this incident."}"
                     </p>
+                  </div>
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Recommended Response</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{selected.aiAnalysis?.recommendedResponse || "Awaiting AI recommendation"}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[
+                      ["ETA", selected.etaMinutes != null ? `${selected.etaMinutes} min` : "--"],
+                      ["Responder", selected.currentResponderStatus || "--"],
+                      ["Area", selected.area || "--"],
+                      ["Street", selected.street || "--"],
+                      ["Village", selected.village || "--"],
+                      ["District", selected.district || "--"],
+                      ["State", selected.state || "--"],
+                      ["Hospital", selected.hospitalAssigned ? `${selected.hospitalAssigned.firstName} ${selected.hospitalAssigned.lastName}` : "--"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="bg-slate-950/40 border border-slate-800 rounded-lg p-2">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">{label}</p>
+                        <p className="text-slate-200 font-semibold truncate">{value}</p>
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="flex items-center gap-1"><Clock size={12} />{fmt(selected.createdAt)}</span>
@@ -207,35 +257,17 @@ const Dashboard = () => {
 
             <Card title="Response Timeline" subtitle="Lifecycle Events" icon={<Clock size={18} />}>
               <div className="space-y-4 relative before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
-                <div className="relative pl-6">
-                  <div className="absolute left-0 top-1 h-3.5 w-3.5 rounded-full bg-red-500 ring-2 ring-red-500/30" />
-                  <p className="text-sm font-semibold text-white">Incident Detected</p>
-                  <p className="text-xs text-slate-500">{fmt(selected?.createdAt)}</p>
-                </div>
                 <AnimatePresence>
-                  {selected?.ambulanceAssigned && (
-                    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="relative pl-6">
-                      <div className="absolute left-0 top-1 h-3.5 w-3.5 rounded-full bg-red-400" />
-                      <p className="text-sm font-semibold text-white">Medical Unit Dispatched</p>
-                      <p className="text-xs text-slate-500">En-route to scene</p>
+                  {(selected?.progressTimeline || []).map(event => (
+                    <motion.div key={`${event.status}-${event.timestamp}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="relative pl-6">
+                      <div className="absolute left-0 top-1 h-3.5 w-3.5 rounded-full bg-red-500 ring-2 ring-red-500/30" />
+                      <p className="text-sm font-semibold text-white">{event.status.replace(/_/g, " ")}</p>
+                      <p className="text-xs text-slate-500">{fmt(event.timestamp)}</p>
+                      <p className="text-[11px] text-slate-600">{event.detail}</p>
                     </motion.div>
-                  )}
-                  {selected?.policeAssigned && (
-                    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="relative pl-6">
-                      <div className="absolute left-0 top-1 h-3.5 w-3.5 rounded-full bg-slate-400" />
-                      <p className="text-sm font-semibold text-white">Police Notified</p>
-                      <p className="text-xs text-slate-500">Dispatch confirmed</p>
-                    </motion.div>
-                  )}
-                  {selected?.hospitalAssigned && (
-                    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="relative pl-6">
-                      <div className="absolute left-0 top-1 h-3.5 w-3.5 rounded-full bg-emerald-500" />
-                      <p className="text-sm font-semibold text-white">Hospital Alerted</p>
-                      <p className="text-xs text-slate-500">Trauma center on standby</p>
-                    </motion.div>
-                  )}
+                  ))}
                 </AnimatePresence>
-                {!selected?.ambulanceAssigned && !selected?.policeAssigned && (
+                {!selected?.progressTimeline?.length && (
                   <div className="pl-6 py-1">
                     <p className="text-xs text-slate-600 animate-pulse">Awaiting operator actions...</p>
                   </div>
@@ -247,7 +279,7 @@ const Dashboard = () => {
 
         {/* Right - Controls + Feed */}
         <div className="lg:col-span-4 space-y-5">
-          <Card title="Dispatch Controls" subtitle="Response Protocol" icon={<Shield size={18} />}>
+          <Card title="Dispatcher Console" subtitle="Assign responders" icon={<Shield size={18} />}>
             <div className="space-y-2.5">
               {[
                 { key: "ambulance", fn: dispatchAmbulance, msg: "Ambulance dispatched", icon: <HeartPulse size={18} />, label: "Dispatch Ambulance", cls: "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20" },
@@ -260,6 +292,21 @@ const Dashboard = () => {
                   <span className="flex items-center gap-2.5">{icon}{label}</span>
                   {dispatching[key] && <RefreshCcw className="animate-spin" size={14} />}
                 </button>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="Unit Status" subtitle="Live assignments" icon={<Truck size={18} />}>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                ["Ambulance", analytics?.ambulancesDeployed ?? 0],
+                ["Police", analytics?.policeUnitsDeployed ?? 0],
+                ["Hospital", analytics?.hospitalsAlerted ?? 0],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
+                  <p className="text-lg font-black text-white">{value}</p>
+                  <p className="text-[9px] text-slate-500 font-bold uppercase">{label}</p>
+                </div>
               ))}
             </div>
           </Card>
@@ -280,7 +327,7 @@ const Dashboard = () => {
                   }`}>
                   <div className="flex justify-between items-start mb-1.5">
                     <span className="text-[10px] text-slate-500 font-bold uppercase">#{acc.id} · {acc.severity}</span>
-                    <Badge variant={SEVERITY_VARIANT[acc.severity] || "default"}>{acc.status}</Badge>
+                    <Badge variant={STATUS_VARIANT[acc.status] || SEVERITY_VARIANT[acc.severity] || "default"}>{acc.status?.replace(/_/g, " ")}</Badge>
                   </div>
                   <p className="font-semibold text-white text-sm truncate">{acc.locationName}</p>
                   <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">

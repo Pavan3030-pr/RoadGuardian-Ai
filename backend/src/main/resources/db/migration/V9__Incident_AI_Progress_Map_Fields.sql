@@ -1,0 +1,11 @@
+ALTER TABLE accidents ADD COLUMN IF NOT EXISTS area VARCHAR(255);
+ALTER TABLE accidents ADD COLUMN IF NOT EXISTS street VARCHAR(255);
+ALTER TABLE accidents ADD COLUMN IF NOT EXISTS village VARCHAR(255);
+ALTER TABLE accidents ADD COLUMN IF NOT EXISTS district VARCHAR(255);
+ALTER TABLE accidents ADD COLUMN IF NOT EXISTS state VARCHAR(255);
+
+ALTER TABLE ai_recommendations ADD COLUMN IF NOT EXISTS vehicles_detected INTEGER;
+ALTER TABLE ai_recommendations ADD COLUMN IF NOT EXISTS injured_persons INTEGER;
+ALTER TABLE ai_recommendations ADD COLUMN IF NOT EXISTS emergency_priority VARCHAR(255);
+ALTER TABLE ai_recommendations ADD COLUMN IF NOT EXISTS ai_summary TEXT;
+ALTER TABLE ai_recommendations ADD COLUMN IF NOT EXISTS recommended_response TEXT;

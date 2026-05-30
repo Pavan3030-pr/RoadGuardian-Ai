@@ -22,6 +22,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	List<User> findByActiveAndDeletedFalse(Boolean active);
 
+	Long countByActiveAndDeletedFalse(Boolean active);
+
 	List<User> findByRoleAndActiveAndDeletedFalse(Role role, Boolean active);
 
 	@Query(value = "SELECT * FROM users u WHERE u.deleted = false AND (6371 * acos(cos(radians(:latitude)) * cos(radians(u.latitude)) * cos(radians(u.longitude) - radians(:longitude)) + sin(radians(:latitude)) * sin(radians(u.latitude)))) <= :radiusKm",

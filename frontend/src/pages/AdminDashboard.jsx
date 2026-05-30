@@ -34,7 +34,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState(null)
   const [accidents, setAccidents] = useState([])
-  const [activeTab, setActiveTab] = useState("overview") // overview, users, accidents, logs
+  const [activeTab, setActiveTab] = useState("overview")
 
   const loadData = async () => {
     setLoading(true)
@@ -57,23 +57,28 @@ const AdminDashboard = () => {
     loadData()
   }, [])
 
-  // Mock data for charts
   const trendData = [
-    { name: 'Mon', count: 4 },
-    { name: 'Tue', count: 7 },
-    { name: 'Wed', count: 5 },
-    { name: 'Thu', count: 12 },
-    { name: 'Fri', count: 9 },
-    { name: 'Sat', count: 15 },
-    { name: 'Sun', count: 11 },
+    { name: '6d', count: stats?.accidentsSixDaysAgo || 0 },
+    { name: '5d', count: stats?.accidentsFiveDaysAgo || 0 },
+    { name: '4d', count: stats?.accidentsFourDaysAgo || 0 },
+    { name: '3d', count: stats?.accidentsThreeDaysAgo || 0 },
+    { name: '2d', count: stats?.accidentsTwoDaysAgo || 0 },
+    { name: 'Yesterday', count: stats?.accidentsYesterday || 0 },
+    { name: 'Today', count: stats?.accidentsToday || 0 },
   ]
 
   const pieData = [
-    { name: 'Critical', value: 35, color: '#ef4444' },
-    { name: 'High', value: 25, color: '#f97316' },
-    { name: 'Moderate', value: 25, color: '#f59e0b' },
-    { name: 'Low', value: 15, color: '#3b82f6' },
+    { name: 'Critical', value: stats?.criticalCases || 0, color: '#ef4444' },
+    { name: 'High', value: stats?.highCases || 0, color: '#f97316' },
+    { name: 'Moderate', value: stats?.moderateCases || 0, color: '#f59e0b' },
+    { name: 'Low', value: stats?.lowCases || 0, color: '#3b82f6' },
   ]
+
+  const assignedUnits = accidents.flatMap(accident => [
+    accident.ambulanceAssigned && { ...accident.ambulanceAssigned, unit: "AMBULANCE", incident: accident.id, status: accident.currentResponderStatus },
+    accident.policeAssigned && { ...accident.policeAssigned, unit: "POLICE", incident: accident.id, status: accident.status },
+    accident.hospitalAssigned && { ...accident.hospitalAssigned, unit: "HOSPITAL", incident: accident.id, status: "ALERTED" },
+  ].filter(Boolean))
 
   if (loading) return <LoadingSpinner fullScreen message="Loading Administrative Console..." />
 
@@ -126,9 +131,9 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                {[
                  { label: "Total Cases", value: stats?.totalAccidents || 0, icon: <Activity />, color: "text-blue-400" },
-                 { label: "Active Users", value: stats?.totalUsers || 0, icon: <Users />, color: "text-emerald-400" },
+                 { label: "Active Users", value: stats?.activeUsers || 0, icon: <Users />, color: "text-emerald-400" },
                  { label: "Critical Priority", value: stats?.criticalCases || 0, icon: <AlertTriangle />, color: "text-red-400" },
-                 { label: "Avg Response", value: "4.2m", icon: <Activity />, color: "text-amber-400" },
+                 { label: "Avg Response", value: `${Number(stats?.averageResponseTime || 0).toFixed(1)}m`, icon: <Activity />, color: "text-amber-400" },
                ].map((stat, i) => (
                  <Card key={i} className="!p-5">
                    <div className="flex items-center gap-4">
@@ -185,7 +190,7 @@ const AdminDashboard = () => {
                        {pieData.map(item => (
                          <div key={item.name} className="flex items-center gap-2 text-xs font-bold text-slate-400">
                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                           {item.name}: {item.value}%
+                           {item.name}: {item.value}
                          </div>
                        ))}
                     </div>
@@ -252,25 +257,20 @@ const AdminDashboard = () => {
 
         {activeTab === "users" && (
            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                { name: "John Medic", role: "AMBULANCE", email: "medic1@agency.gov", status: "Active" },
-                { name: "Officer Sarah", role: "POLICE", email: "sarah.p@city.gov", status: "Active" },
-                { name: "Dr. Arvin", role: "HOSPITAL", email: "arvin@trauma.center", status: "Active" },
-                { name: "Mike Reporter", role: "USER", email: "mike88@gmail.com", status: "Active" },
-              ].map((user, i) => (
+              {assignedUnits.map((user, i) => (
                 <Card key={i} className="group hover:border-slate-700 transition-all">
                    <div className="flex items-center gap-4 mb-4">
                       <div className="h-12 w-12 rounded-full bg-slate-800 flex items-center justify-center font-black text-slate-400">
-                        {user.name.split(' ').map(n => n[0]).join('')}
+                        {[user.firstName, user.lastName].filter(Boolean).map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <p className="font-bold text-white group-hover:text-red-400 transition-colors">{user.name}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{user.role}</p>
+                        <p className="font-bold text-white group-hover:text-red-400 transition-colors">{user.firstName} {user.lastName}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{user.unit}</p>
                       </div>
                    </div>
                    <div className="space-y-1 mb-6">
                       <p className="text-xs text-slate-500 flex items-center gap-2"><Activity size={10} /> {user.email}</p>
-                      <p className="text-xs text-emerald-500 flex items-center gap-2"><UserCheck size={10} /> Verification: Verified</p>
+                      <p className="text-xs text-emerald-500 flex items-center gap-2"><UserCheck size={10} /> Incident #{user.incident} · {user.status}</p>
                    </div>
                    <div className="flex gap-2">
                       <button className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-[10px] font-bold border border-slate-800 transition-all">EDIT PROFILE</button>
@@ -278,6 +278,11 @@ const AdminDashboard = () => {
                    </div>
                 </Card>
               ))}
+              {assignedUnits.length === 0 && (
+                <Card className="md:col-span-3">
+                  <p className="text-sm text-slate-500">No active unit assignments found.</p>
+                </Card>
+              )}
            </div>
         )}
       </main>

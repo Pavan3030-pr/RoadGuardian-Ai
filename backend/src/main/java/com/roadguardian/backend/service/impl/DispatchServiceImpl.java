@@ -32,12 +32,15 @@ public class DispatchServiceImpl implements DispatchService {
 				.responseType(EmergencyResponse.ResponseType.AMBULANCE)
 				.status(EmergencyResponse.ResponseStatus.DISPATCHED)
 				.responder(ambulance)
+				.currentLatitude(accident.getLatitude() + 0.015)
+				.currentLongitude(accident.getLongitude() + 0.015)
+				.etaMinutes(5)
 				.build();
 
 		emergencyResponseRepository.save(response);
 
 		accident.setAmbulanceAssigned(ambulance);
-		accident.setStatus(Accident.IncidentStatus.DISPATCHED);
+		accident.setStatus(Accident.IncidentStatus.AMBULANCE_ASSIGNED);
 		accidentRepository.save(accident);
 
 		log.info("Ambulance dispatched for accident: {}", accidentId);
@@ -55,12 +58,15 @@ public class DispatchServiceImpl implements DispatchService {
 				.responseType(EmergencyResponse.ResponseType.POLICE)
 				.status(EmergencyResponse.ResponseStatus.DISPATCHED)
 				.responder(police)
+				.currentLatitude(accident.getLatitude())
+				.currentLongitude(accident.getLongitude())
+				.etaMinutes(8)
 				.build();
 
 		emergencyResponseRepository.save(response);
 
 		accident.setPoliceAssigned(police);
-		accident.setStatus(Accident.IncidentStatus.DISPATCHED);
+		accident.setStatus(Accident.IncidentStatus.POLICE_ASSIGNED);
 		accidentRepository.save(accident);
 
 		log.info("Police dispatched for accident: {}", accidentId);
@@ -78,12 +84,15 @@ public class DispatchServiceImpl implements DispatchService {
 				.responseType(EmergencyResponse.ResponseType.HOSPITAL_COORDINATION)
 				.status(EmergencyResponse.ResponseStatus.DISPATCHED)
 				.responder(hospital)
+				.currentLatitude(accident.getLatitude())
+				.currentLongitude(accident.getLongitude())
+				.etaMinutes(0)
 				.build();
 
 		emergencyResponseRepository.save(response);
 
 		accident.setHospitalAssigned(hospital);
-		accident.setStatus(Accident.IncidentStatus.DISPATCHED);
+		accident.setStatus(Accident.IncidentStatus.HOSPITAL_ALERTED);
 		accidentRepository.save(accident);
 
 		log.info("Hospital alerted for accident: {}", accidentId);
@@ -94,7 +103,23 @@ public class DispatchServiceImpl implements DispatchService {
 				.orElseThrow(() -> new ResourceNotFoundException("Response not found"));
 
 		response.setStatus(EmergencyResponse.ResponseStatus.valueOf(status.toUpperCase()));
+		if (response.getStatus() == EmergencyResponse.ResponseStatus.ARRIVED) {
+			response.setArrivedAt(java.time.LocalDateTime.now());
+			if (response.getResponseType() == EmergencyResponse.ResponseType.AMBULANCE) {
+				response.getAccident().setStatus(Accident.IncidentStatus.AMBULANCE_ARRIVED);
+			}
+		}
+		if (response.getStatus() == EmergencyResponse.ResponseStatus.COMPLETED) {
+			response.setCompletedAt(java.time.LocalDateTime.now());
+			if (response.getResponseType() == EmergencyResponse.ResponseType.AMBULANCE) {
+				response.getAccident().setStatus(Accident.IncidentStatus.PATIENT_PICKED);
+			}
+			if (response.getResponseType() == EmergencyResponse.ResponseType.HOSPITAL_COORDINATION) {
+				response.getAccident().setStatus(Accident.IncidentStatus.REACHED_HOSPITAL);
+			}
+		}
 		emergencyResponseRepository.save(response);
+		accidentRepository.save(response.getAccident());
 
 		log.info("Response status updated to: {}", status);
 	}
@@ -113,7 +138,8 @@ public class DispatchServiceImpl implements DispatchService {
 		Accident accident = accidentRepository.findById(accidentId)
 				.orElseThrow(() -> new ResourceNotFoundException("Accident not found"));
 
-		accident.setStatus(Accident.IncidentStatus.RESOLVED);
+		accident.setStatus(Accident.IncidentStatus.CASE_CLOSED);
+		accident.setResolvedAt(java.time.LocalDateTime.now());
 		accidentRepository.save(accident);
 
 		log.info("Incident marked as resolved: {}", accidentId);

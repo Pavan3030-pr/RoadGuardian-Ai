@@ -17,5 +17,10 @@ public class AIRiskRecommendationDTO {
 	private String weatherCondition;
 	private String trafficDensity;
 	private Integer confidenceScore;
+	private Integer vehiclesDetected;
+	private Integer injuredPersons;
+	private String emergencyPriority;
+	private String aiSummary;
+	private String recommendedResponse;
 	private String recommendation;
 }

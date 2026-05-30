@@ -7,10 +7,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.roadguardian.backend.model.dto.response.DashboardMetricsResponse;
 import com.roadguardian.backend.repository.AccidentRepository;
+import com.roadguardian.backend.repository.EmergencyResponseRepository;
 import com.roadguardian.backend.repository.UserRepository;
 import com.roadguardian.backend.repository.AnalyticsEventRepository;
 import com.roadguardian.backend.model.entity.Accident;
 import com.roadguardian.backend.model.entity.AnalyticsEvent;
+import com.roadguardian.backend.model.entity.EmergencyResponse;
 import com.roadguardian.backend.service.AnalyticsService;
 
 import java.time.LocalDateTime;
@@ -23,6 +25,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
 	private final AccidentRepository accidentRepository;
 	private final UserRepository userRepository;
+	private final EmergencyResponseRepository emergencyResponseRepository;
 	private final AnalyticsEventRepository analyticsEventRepository;
 
 	@Override
@@ -30,8 +33,9 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 	public DashboardMetricsResponse getDashboardMetrics() {
 		long totalAccidents = accidentRepository.count();
 		long criticalCases = accidentRepository.countBySeverityAndDeletedFalse(Accident.SeverityLevel.CRITICAL);
-		long resolvedCases = accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.RESOLVED);
-		long activeCases = totalAccidents - resolvedCases;
+		long resolvedCases = accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.RESOLVED)
+				+ accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.CASE_CLOSED);
+		long activeCases = Math.max(0, totalAccidents - resolvedCases);
 
 		LocalDateTime now = LocalDateTime.now();
 		LocalDateTime today = now.truncatedTo(ChronoUnit.DAYS);
@@ -47,6 +51,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 		double resolvedPercentage = totalAccidents > 0 ? (resolvedCases * 100.0) / totalAccidents : 0;
 
 		long totalUsers = userRepository.count();
+		long activeUsers = userRepository.countByActiveAndDeletedFalse(true);
 
 		return DashboardMetricsResponse.builder()
 				.totalAccidents(totalAccidents)
@@ -55,15 +60,25 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 				.activeCases(activeCases)
 				.averageResponseTime(averageResponseTime)
 				.criticalPercentage(criticalPercentage)
-				.totalEmergencyResponses(0L) // Calculate from EmergencyResponse table
-				.ambulancesDeployed(0L) // Calculate from assignments
-				.policeUnitsDeployed(0L) // Calculate from assignments
-				.hospitalsAlerted(0L) // Calculate from assignments
+				.totalEmergencyResponses(emergencyResponseRepository.count())
+				.ambulancesDeployed(emergencyResponseRepository.countByResponseType(EmergencyResponse.ResponseType.AMBULANCE))
+				.policeUnitsDeployed(emergencyResponseRepository.countByResponseType(EmergencyResponse.ResponseType.POLICE))
+				.hospitalsAlerted(emergencyResponseRepository.countByResponseType(EmergencyResponse.ResponseType.HOSPITAL_COORDINATION))
 				.totalUsers(totalUsers)
 				.accidentsToday(accidentsToday)
 				.accidentsThisWeek(accidentsThisWeek)
 				.accidentsThisMonth(accidentsThisMonth)
 				.resolvedPercentage(resolvedPercentage)
+				.activeUsers(activeUsers)
+				.highCases(accidentRepository.countBySeverityAndDeletedFalse(Accident.SeverityLevel.HIGH))
+				.moderateCases(accidentRepository.countBySeverityAndDeletedFalse(Accident.SeverityLevel.MODERATE))
+				.lowCases(accidentRepository.countBySeverityAndDeletedFalse(Accident.SeverityLevel.LOW))
+				.accidentsYesterday(countDay(today.minusDays(1)))
+				.accidentsTwoDaysAgo(countDay(today.minusDays(2)))
+				.accidentsThreeDaysAgo(countDay(today.minusDays(3)))
+				.accidentsFourDaysAgo(countDay(today.minusDays(4)))
+				.accidentsFiveDaysAgo(countDay(today.minusDays(5)))
+				.accidentsSixDaysAgo(countDay(today.minusDays(6)))
 				.build();
 	}
 
@@ -81,9 +96,12 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 	}
 
 	private double calculateAverageResponseTime() {
-		// Calculate average response time from resolved incidents
-		// For now, returning 0 - this would need data from your database
-		return 0.0;
+		Double averageMs = accidentRepository.averageResponseTimeMs();
+		return averageMs == null ? 0.0 : averageMs / 60000.0;
+	}
+
+	private long countDay(LocalDateTime dayStart) {
+		return accidentRepository.countAccidentsBetween(dayStart, dayStart.plusDays(1));
 	}
 
 	@Override
@@ -101,7 +119,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 	@Override
 	@Transactional(readOnly = true)
 	public Long getResolvedAccidents() {
-		return accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.RESOLVED);
+		return accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.RESOLVED)
+				+ accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.CASE_CLOSED);
 	}
 
 	@Override
@@ -119,8 +138,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 	@Override
 	@Transactional(readOnly = true)
 	public Long getActiveUsers() {
-		// Count active users - this would need a query in UserRepository
-		return 0L;
+		return userRepository.countByActiveAndDeletedFalse(true);
 	}
 
 	@Override
@@ -135,7 +153,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 	@Transactional(readOnly = true)
 	public Double getResolvedPercentage() {
 		long total = accidentRepository.count();
-		long resolved = accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.RESOLVED);
+		long resolved = accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.RESOLVED)
+				+ accidentRepository.countByStatusAndDeletedFalse(Accident.IncidentStatus.CASE_CLOSED);
 		return total > 0 ? (resolved * 100.0) / total : 0.0;
 	}
 }

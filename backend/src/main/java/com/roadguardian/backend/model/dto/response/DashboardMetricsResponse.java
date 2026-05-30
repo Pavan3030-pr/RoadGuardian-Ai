@@ -37,4 +37,24 @@ public class DashboardMetricsResponse {
     private Long accidentsThisMonth;
 
     private Double resolvedPercentage;
+
+    private Long activeUsers;
+
+    private Long highCases;
+
+    private Long moderateCases;
+
+    private Long lowCases;
+
+    private Long accidentsYesterday;
+
+    private Long accidentsTwoDaysAgo;
+
+    private Long accidentsThreeDaysAgo;
+
+    private Long accidentsFourDaysAgo;
+
+    private Long accidentsFiveDaysAgo;
+
+    private Long accidentsSixDaysAgo;
 }

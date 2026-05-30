@@ -15,19 +15,24 @@ import com.roadguardian.backend.exception.ResourceNotFoundException;
 import com.roadguardian.backend.model.dto.request.CreateAccidentRequest;
 import com.roadguardian.backend.model.dto.request.UpdateAccidentRequest;
 import com.roadguardian.backend.model.dto.response.AccidentResponse;
+import com.roadguardian.backend.model.entity.AIRecommendation;
 import com.roadguardian.backend.model.entity.Accident;
 import com.roadguardian.backend.model.entity.Role;
 import com.roadguardian.backend.model.entity.User;
 import com.roadguardian.backend.model.dto.response.UserResponse;
 import com.roadguardian.backend.model.entity.EmergencyResponse;
 import com.roadguardian.backend.repository.AccidentRepository;
+import com.roadguardian.backend.repository.AIRecommendationRepository;
 import com.roadguardian.backend.repository.EmergencyResponseRepository;
 import com.roadguardian.backend.repository.RoleRepository;
 import com.roadguardian.backend.repository.UserRepository;
 import com.roadguardian.backend.service.AccidentService;
 import com.roadguardian.backend.service.NotificationService;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,6 +43,7 @@ import java.util.stream.Collectors;
 public class AccidentServiceImpl implements AccidentService {
 
 	private final AccidentRepository accidentRepository;
+	private final AIRecommendationRepository aiRecommendationRepository;
 	private final EmergencyResponseRepository emergencyResponseRepository;
 	private final UserRepository userRepository;
 	private final RoleRepository roleRepository;
@@ -56,8 +62,13 @@ public class AccidentServiceImpl implements AccidentService {
 				.latitude(request.getLatitude())
 				.longitude(request.getLongitude())
 				.locationName(request.getLocationName())
+				.area(request.getArea())
+				.street(request.getStreet())
+				.village(request.getVillage())
+				.district(request.getDistrict())
+				.state(request.getState())
 				.severity(Accident.SeverityLevel.valueOf(request.getSeverity().toUpperCase()))
-				.status(Accident.IncidentStatus.REPORTED)
+				.status(Accident.IncidentStatus.ACCIDENT_DETECTED)
 				.riskScore(calculateRiskScore(request))
 				.casualties(request.getCasualties() != null ? request.getCasualties() : 0)
 				.imageUrl(request.getImageUrl())
@@ -68,6 +79,9 @@ public class AccidentServiceImpl implements AccidentService {
 				.roadType(request.getRoadType())
 				.build();
 
+		accident = accidentRepository.save(accident);
+		saveAIAnalysis(accident);
+		accident.setStatus(Accident.IncidentStatus.AI_VERIFIED);
 		accident = accidentRepository.save(accident);
 		log.info("Accident created with ID: {}", accident.getId());
 		messagingTemplate.convertAndSend("/topic/incidents", convertToResponse(accident));
@@ -115,8 +129,11 @@ public class AccidentServiceImpl implements AccidentService {
 			accident.setStatus(Accident.IncidentStatus.valueOf(request.getStatus().toUpperCase()));
 
 			if (!oldStatus.equals(accident.getStatus())) {
-				long responseTime = LocalDateTime.now().getNano() - accident.getCreatedAt().getNano();
-				accident.setResponseTimeMs(responseTime / 1_000_000);
+				long responseTime = Duration.between(accident.getCreatedAt(), LocalDateTime.now()).toMillis();
+				accident.setResponseTimeMs(responseTime);
+				if (accident.getStatus() == Accident.IncidentStatus.CASE_CLOSED || accident.getStatus() == Accident.IncidentStatus.RESOLVED) {
+					accident.setResolvedAt(LocalDateTime.now());
+				}
 			}
 		}
 		if (request.getCasualties() != null) {
@@ -127,6 +144,21 @@ public class AccidentServiceImpl implements AccidentService {
 		}
 		if (request.getVideoUrl() != null) {
 			accident.setVideoUrl(request.getVideoUrl());
+		}
+		if (request.getArea() != null) {
+			accident.setArea(request.getArea());
+		}
+		if (request.getStreet() != null) {
+			accident.setStreet(request.getStreet());
+		}
+		if (request.getVillage() != null) {
+			accident.setVillage(request.getVillage());
+		}
+		if (request.getDistrict() != null) {
+			accident.setDistrict(request.getDistrict());
+		}
+		if (request.getState() != null) {
+			accident.setState(request.getState());
 		}
 		if (request.getWeatherCondition() != null) {
 			accident.setWeatherCondition(request.getWeatherCondition());
@@ -189,7 +221,11 @@ public class AccidentServiceImpl implements AccidentService {
 	}
 
 	public List<AccidentResponse> getActiveAccidents() {
-		List<Accident.IncidentStatus> inactiveStatuses = List.of(Accident.IncidentStatus.RESOLVED, Accident.IncidentStatus.CANCELLED);
+		List<Accident.IncidentStatus> inactiveStatuses = List.of(
+				Accident.IncidentStatus.RESOLVED,
+				Accident.IncidentStatus.CANCELLED,
+				Accident.IncidentStatus.CASE_CLOSED
+		);
 		List<AccidentResponse> activeAccidents = accidentRepository.findActiveAccidents(inactiveStatuses).stream()
 				.map(this::convertToResponse)
 				.collect(Collectors.toList());
@@ -207,7 +243,7 @@ public class AccidentServiceImpl implements AccidentService {
 				: getOrCreateResponder("AMBULANCE", "ambulance", "Road", "Medic", "+911000000");
 
 		accident.setAmbulanceAssigned(ambulance);
-		accident.setStatus(Accident.IncidentStatus.DISPATCHED);
+		accident.setStatus(Accident.IncidentStatus.AMBULANCE_ASSIGNED);
 		accident = accidentRepository.save(accident);
 
 		saveEmergencyResponse(accident, ambulance, EmergencyResponse.ResponseType.AMBULANCE, "AMB-101");
@@ -226,7 +262,7 @@ public class AccidentServiceImpl implements AccidentService {
 				: getOrCreateResponder("POLICE", "police", "Road", "Guardian", "+911000001");
 
 		accident.setPoliceAssigned(police);
-		accident.setStatus(Accident.IncidentStatus.DISPATCHED);
+		accident.setStatus(Accident.IncidentStatus.POLICE_ASSIGNED);
 		accident = accidentRepository.save(accident);
 
 		saveEmergencyResponse(accident, police, EmergencyResponse.ResponseType.POLICE, "POL-202");
@@ -245,7 +281,7 @@ public class AccidentServiceImpl implements AccidentService {
 				: getOrCreateResponder("HOSPITAL", "hospital", "City", "Hospital", "+911000002");
 
 		accident.setHospitalAssigned(hospital);
-		accident.setStatus(Accident.IncidentStatus.DISPATCHED);
+		accident.setStatus(Accident.IncidentStatus.HOSPITAL_ALERTED);
 		accident = accidentRepository.save(accident);
 
 		saveEmergencyResponse(accident, hospital, EmergencyResponse.ResponseType.HOSPITAL_COORDINATION, "HOS-303");
@@ -311,12 +347,23 @@ public class AccidentServiceImpl implements AccidentService {
 				.latitude(accident.getLatitude())
 				.longitude(accident.getLongitude())
 				.locationName(accident.getLocationName())
+				.area(accident.getArea())
+				.street(accident.getStreet())
+				.village(accident.getVillage())
+				.district(accident.getDistrict())
+				.state(accident.getState())
 				.severity(accident.getSeverity().toString())
 				.status(accident.getStatus().toString())
 				.riskScore(accident.getRiskScore())
 				.casualties(accident.getCasualties())
 				.imageUrl(accident.getImageUrl())
 				.videoUrl(accident.getVideoUrl())
+				.aiAnalysis(convertAIAnalysis(accident))
+				.progressTimeline(buildProgressTimeline(accident))
+				.currentResponderStatus(getCurrentResponderStatus(accident))
+				.etaMinutes(getEtaMinutes(accident))
+				.ambulanceLatitude(getAmbulanceLatitude(accident))
+				.ambulanceLongitude(getAmbulanceLongitude(accident))
 				.reportedBy(accident.getReportedBy() != null ? convertToUserResponse(accident.getReportedBy()) : null)
 				.responseTimeMs(accident.getResponseTimeMs())
 				.weatherCondition(accident.getWeatherCondition())
@@ -328,6 +375,114 @@ public class AccidentServiceImpl implements AccidentService {
 				.createdAt(accident.getCreatedAt())
 				.updatedAt(accident.getUpdatedAt())
 				.build();
+	}
+
+	private void saveAIAnalysis(Accident accident) {
+		int casualties = accident.getCasualties() == null ? 0 : accident.getCasualties();
+		int vehiclesDetected = switch (accident.getSeverity()) {
+			case LOW -> 1;
+			case MODERATE -> 2;
+			case HIGH -> 3;
+			case CRITICAL -> Math.max(3, Math.min(6, casualties + 2));
+		};
+		int injuredPersons = Math.max(casualties, accident.getSeverity() == Accident.SeverityLevel.LOW ? 0 : 1);
+		String priority = switch (accident.getSeverity()) {
+			case CRITICAL -> "IMMEDIATE";
+			case HIGH -> "HIGH";
+			case MODERATE -> "PRIORITY";
+			case LOW -> "ROUTINE";
+		};
+		AIRecommendation recommendation = aiRecommendationRepository.findTopByAccidentIdOrderByCreatedAtDesc(accident.getId())
+				.orElseGet(() -> AIRecommendation.builder().accident(accident).build());
+		recommendation.setSeverity(accident.getSeverity().name());
+		recommendation.setConfidenceScore(Math.min(99, Math.max(70, accident.getRiskScore() + 8)));
+		recommendation.setVehiclesDetected(vehiclesDetected);
+		recommendation.setInjuredPersons(injuredPersons);
+		recommendation.setEmergencyPriority(priority);
+		recommendation.setAmbulanceNeeded(injuredPersons > 2 ? "MULTIPLE_AMBULANCES" : "ONE_AMBULANCE");
+		recommendation.setHospitalRequired(accident.getSeverity() == Accident.SeverityLevel.CRITICAL ? "TRAUMA_CENTER" : "NEAREST_AVAILABLE_HOSPITAL");
+		recommendation.setPoliceAlertLevel(accident.getSeverity() == Accident.SeverityLevel.LOW ? "ROUTINE" : "PRIORITY");
+		recommendation.setRoadblockRequired(accident.getSeverity() == Accident.SeverityLevel.HIGH || accident.getSeverity() == Accident.SeverityLevel.CRITICAL ? "YES_REQUIRED" : "NOT_REQUIRED");
+		recommendation.setWeatherCondition(accident.getWeatherCondition());
+		recommendation.setTrafficDensity(accident.getTrafficDensity());
+		recommendation.setAiSummary(String.format("%s incident verified near %s with %d vehicle(s) detected and %d injured person(s).",
+				accident.getSeverity().name(), accident.getLocationName(), vehiclesDetected, injuredPersons));
+		recommendation.setRecommendedResponse(String.format("Priority %s response: dispatch ambulance, notify police, and alert %s.",
+				priority, recommendation.getHospitalRequired()));
+		aiRecommendationRepository.save(recommendation);
+	}
+
+	private AccidentResponse.AIAnalysisResponse convertAIAnalysis(Accident accident) {
+		return aiRecommendationRepository.findTopByAccidentIdOrderByCreatedAtDesc(accident.getId())
+				.map(ai -> AccidentResponse.AIAnalysisResponse.builder()
+						.severity(ai.getSeverity())
+						.confidenceScore(ai.getConfidenceScore())
+						.vehiclesDetected(ai.getVehiclesDetected())
+						.injuredPersons(ai.getInjuredPersons())
+						.emergencyPriority(ai.getEmergencyPriority())
+						.aiSummary(ai.getAiSummary())
+						.recommendedResponse(ai.getRecommendedResponse())
+						.build())
+				.orElse(null);
+	}
+
+	private List<AccidentResponse.ProgressEventResponse> buildProgressTimeline(Accident accident) {
+		List<AccidentResponse.ProgressEventResponse> events = new ArrayList<>();
+		events.add(progress("ACCIDENT_DETECTED", accident.getCreatedAt(), "Incident reported and logged"));
+		aiRecommendationRepository.findTopByAccidentIdOrderByCreatedAtDesc(accident.getId())
+				.ifPresent(ai -> events.add(progress("AI_VERIFIED", ai.getCreatedAt(), "AI analysis completed")));
+		emergencyResponseRepository.findByAccidentIdOrderByCreatedAtAsc(accident.getId()).forEach(response -> {
+			if (response.getResponseType() == EmergencyResponse.ResponseType.AMBULANCE) {
+				events.add(progress("AMBULANCE_ASSIGNED", response.getCreatedAt(), response.getResponder().getFirstName() + " assigned"));
+				if (response.getArrivedAt() != null) events.add(progress("AMBULANCE_ARRIVED", response.getArrivedAt(), "Ambulance arrived at scene"));
+				if (response.getCompletedAt() != null) events.add(progress("PATIENT_PICKED", response.getCompletedAt(), "Patient transport started"));
+			}
+			if (response.getResponseType() == EmergencyResponse.ResponseType.POLICE) {
+				events.add(progress("POLICE_ASSIGNED", response.getCreatedAt(), response.getResponder().getFirstName() + " assigned"));
+			}
+			if (response.getResponseType() == EmergencyResponse.ResponseType.HOSPITAL_COORDINATION) {
+				events.add(progress("HOSPITAL_ALERTED", response.getCreatedAt(), response.getResponder().getFirstName() + " alerted"));
+				if (response.getCompletedAt() != null) events.add(progress("REACHED_HOSPITAL", response.getCompletedAt(), "Patient reached hospital"));
+			}
+		});
+		if (accident.getResolvedAt() != null || accident.getStatus() == Accident.IncidentStatus.CASE_CLOSED || accident.getStatus() == Accident.IncidentStatus.RESOLVED) {
+			events.add(progress("CASE_CLOSED", accident.getResolvedAt() != null ? accident.getResolvedAt() : accident.getUpdatedAt(), "Incident closed"));
+		}
+		return events.stream()
+				.filter(e -> e.getTimestamp() != null)
+				.sorted(Comparator.comparing(AccidentResponse.ProgressEventResponse::getTimestamp))
+				.collect(Collectors.toList());
+	}
+
+	private AccidentResponse.ProgressEventResponse progress(String status, LocalDateTime timestamp, String detail) {
+		return AccidentResponse.ProgressEventResponse.builder().status(status).timestamp(timestamp).detail(detail).build();
+	}
+
+	private EmergencyResponse latestAmbulanceResponse(Accident accident) {
+		return emergencyResponseRepository.findByAccidentId(accident.getId()).stream()
+				.filter(r -> r.getResponseType() == EmergencyResponse.ResponseType.AMBULANCE)
+				.max(Comparator.comparing(EmergencyResponse::getUpdatedAt))
+				.orElse(null);
+	}
+
+	private String getCurrentResponderStatus(Accident accident) {
+		EmergencyResponse response = latestAmbulanceResponse(accident);
+		return response != null ? response.getStatus().name() : accident.getStatus().name();
+	}
+
+	private Integer getEtaMinutes(Accident accident) {
+		EmergencyResponse response = latestAmbulanceResponse(accident);
+		return response != null ? response.getEtaMinutes() : null;
+	}
+
+	private Double getAmbulanceLatitude(Accident accident) {
+		EmergencyResponse response = latestAmbulanceResponse(accident);
+		return response != null ? response.getCurrentLatitude() : null;
+	}
+
+	private Double getAmbulanceLongitude(Accident accident) {
+		EmergencyResponse response = latestAmbulanceResponse(accident);
+		return response != null ? response.getCurrentLongitude() : null;
 	}
 
 	private UserResponse convertToUserResponse(User user) {
@@ -390,8 +545,8 @@ public class AccidentServiceImpl implements AccidentService {
 				.responseType(type)
 				.status(EmergencyResponse.ResponseStatus.DISPATCHED)
 				.etaMinutes(5)
-				.currentLatitude(accident.getLatitude())
-				.currentLongitude(accident.getLongitude())
+				.currentLatitude(type == EmergencyResponse.ResponseType.AMBULANCE ? accident.getLatitude() + 0.015 : accident.getLatitude())
+				.currentLongitude(type == EmergencyResponse.ResponseType.AMBULANCE ? accident.getLongitude() + 0.015 : accident.getLongitude())
 				.vehicleRegistration(vehicleRegistration)
 				.notes("Auto-dispatched by RoadGuardian")
 				.build();

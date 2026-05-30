@@ -26,6 +26,16 @@ public class UpdateAccidentRequest {
 
     private String videoUrl;
 
+    private String area;
+
+    private String street;
+
+    private String village;
+
+    private String district;
+
+    private String state;
+
     private String weatherCondition;
 
     private String trafficDensity;

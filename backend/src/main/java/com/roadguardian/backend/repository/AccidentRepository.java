@@ -45,6 +45,9 @@ public interface AccidentRepository extends JpaRepository<Accident, Long> {
 	@Query("SELECT COUNT(a) FROM Accident a WHERE a.createdAt >= :startDate AND a.createdAt <= :endDate AND a.deleted = false")
 	Long countAccidentsBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
+	@Query("SELECT AVG(a.responseTimeMs) FROM Accident a WHERE a.responseTimeMs IS NOT NULL AND a.deleted = false")
+	Double averageResponseTimeMs();
+
 	Page<Accident> findBySeverity(Accident.SeverityLevel severity, Pageable pageable);
 
 	Page<Accident> findByStatus(Accident.IncidentStatus status, Pageable pageable);

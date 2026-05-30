@@ -71,20 +71,31 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 		String policeAlertLevel = determinePoliceAlertLevel(accident.getSeverity());
 		String roadblockRequired = determineRoadblockNeeded(accident.getSeverity(), trafficDensity);
 		Integer confidenceScore = calculateConfidenceScore(accident.getRiskScore());
+		Integer vehiclesDetected = estimateVehicles(accident);
+		Integer injuredPersons = Math.max(accident.getCasualties() == null ? 0 : accident.getCasualties(), estimateInjuries(accident));
+		String emergencyPriority = determineEmergencyPriority(accident.getSeverity(), injuredPersons);
+		String aiSummary = buildSummary(accident, vehiclesDetected, injuredPersons, trafficDensity);
+		String recommendedResponse = buildRecommendedResponse(ambulanceNeeded, hospitalRequired, policeAlertLevel, roadblockRequired);
 
-		AIRecommendation recommendation = AIRecommendation.builder()
-				.accident(accident)
-				.severity(accident.getSeverity().name())
-				.ambulanceNeeded(ambulanceNeeded)
-				.hospitalRequired(hospitalRequired)
-				.policeAlertLevel(policeAlertLevel)
-				.roadblockRequired(roadblockRequired)
-				.weatherCondition(weatherCondition)
-				.trafficDensity(trafficDensity)
-				.confidenceScore(confidenceScore)
-				.build();
+		AIRecommendation recommendation = aiRecommendationRepository.findTopByAccidentIdOrderByCreatedAtDesc(accident.getId())
+				.orElseGet(() -> AIRecommendation.builder().accident(accident).build());
+		recommendation.setSeverity(accident.getSeverity().name());
+		recommendation.setAmbulanceNeeded(ambulanceNeeded);
+		recommendation.setHospitalRequired(hospitalRequired);
+		recommendation.setPoliceAlertLevel(policeAlertLevel);
+		recommendation.setRoadblockRequired(roadblockRequired);
+		recommendation.setWeatherCondition(weatherCondition);
+		recommendation.setTrafficDensity(trafficDensity);
+		recommendation.setConfidenceScore(confidenceScore);
+		recommendation.setVehiclesDetected(vehiclesDetected);
+		recommendation.setInjuredPersons(injuredPersons);
+		recommendation.setEmergencyPriority(emergencyPriority);
+		recommendation.setAiSummary(aiSummary);
+		recommendation.setRecommendedResponse(recommendedResponse);
 
 		recommendation = aiRecommendationRepository.save(recommendation);
+		accident.setStatus(Accident.IncidentStatus.AI_VERIFIED);
+		accidentRepository.save(accident);
 		log.info("Generated and saved AI recommendation for accident ID: {}", accident.getId());
 
 		analyticsService.logEvent("AI_PREDICTION", "Risk: " + accident.getRiskScore() + ", Confidence: " + confidenceScore, null, accident.getId());
@@ -106,6 +117,11 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 				.hospitalRequired("GENERAL_HOSPITAL")
 				.policeAlertLevel("PRIORITY")
 				.roadblockRequired("NOT_REQUIRED")
+				.vehiclesDetected(random.nextInt(3) + 1)
+				.injuredPersons(random.nextInt(4))
+				.emergencyPriority("PRIORITY")
+				.aiSummary("Computer vision indicates a likely road incident with visible vehicle damage.")
+				.recommendedResponse("Dispatch medical support, verify road obstruction, and notify local traffic police.")
 				.build();
 	}
 
@@ -160,6 +176,40 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 		return Math.min(100, riskScore + random.nextInt(20) - 10);
 	}
 
+	private Integer estimateVehicles(Accident accident) {
+		int base = accident.getSeverity() == Accident.SeverityLevel.LOW ? 1 : 2;
+		if (accident.getSeverity() == Accident.SeverityLevel.CRITICAL) {
+			base = 3;
+		}
+		return Math.min(6, base + Math.max(0, (accident.getCasualties() == null ? 0 : accident.getCasualties()) / 3));
+	}
+
+	private Integer estimateInjuries(Accident accident) {
+		return switch (accident.getSeverity()) {
+			case LOW -> 0;
+			case MODERATE -> 1;
+			case HIGH -> 2;
+			case CRITICAL -> 3;
+		};
+	}
+
+	private String determineEmergencyPriority(Accident.SeverityLevel severity, Integer injuredPersons) {
+		if (severity == Accident.SeverityLevel.CRITICAL || injuredPersons >= 3) return "IMMEDIATE";
+		if (severity == Accident.SeverityLevel.HIGH || injuredPersons >= 1) return "HIGH";
+		if (severity == Accident.SeverityLevel.MODERATE) return "PRIORITY";
+		return "ROUTINE";
+	}
+
+	private String buildSummary(Accident accident, Integer vehiclesDetected, Integer injuredPersons, String trafficDensity) {
+		return String.format("%s severity collision detected near %s. Estimated vehicles: %d. Injured persons: %d. Traffic density: %s.",
+				accident.getSeverity().name(), accident.getLocationName(), vehiclesDetected, injuredPersons, trafficDensity);
+	}
+
+	private String buildRecommendedResponse(String ambulanceNeeded, String hospitalRequired, String policeAlertLevel, String roadblockRequired) {
+		return String.format("Assign %s, alert %s, set police level to %s, roadblock: %s.",
+				ambulanceNeeded, hospitalRequired, policeAlertLevel, roadblockRequired);
+	}
+
 	private AIRiskRecommendationDTO convertToDTO(AIRecommendation recommendation) {
 		return AIRiskRecommendationDTO.builder()
 				.accidentId(recommendation.getAccident().getId())
@@ -172,6 +222,11 @@ public class AIRiskEngineServiceImpl implements AIRiskEngineService {
 				.weatherCondition(recommendation.getWeatherCondition())
 				.trafficDensity(recommendation.getTrafficDensity())
 				.confidenceScore(recommendation.getConfidenceScore())
+				.vehiclesDetected(recommendation.getVehiclesDetected())
+				.injuredPersons(recommendation.getInjuredPersons())
+				.emergencyPriority(recommendation.getEmergencyPriority())
+				.aiSummary(recommendation.getAiSummary())
+				.recommendedResponse(recommendation.getRecommendedResponse())
 				.build();
 	}
 }

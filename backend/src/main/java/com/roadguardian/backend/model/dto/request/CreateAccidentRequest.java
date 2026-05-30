@@ -29,6 +29,16 @@ public class CreateAccidentRequest {
     @NotBlank(message = "Location name is required")
     private String locationName;
 
+    private String area;
+
+    private String street;
+
+    private String village;
+
+    private String district;
+
+    private String state;
+
     @NotBlank(message = "Severity is required")
     private String severity;
 
