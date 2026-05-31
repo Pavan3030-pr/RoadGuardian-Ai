@@ -16,22 +16,18 @@ public class WebConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
-        // Allow credentials like cookies or auth headers
         config.setAllowCredentials(true);
         
-        // Whitelist both local dev and your live production Vercel apps
-        config.setAllowedOrigins(Arrays.asList(
+        // ✅ Switch to Origin Patterns to whitelist your specific project domain + subdomains
+        config.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:5173",
-            "https://vercel.app"
+            "https://road-guardian-ai.vercel.app",  // Your main production deployment
+            "https://*.vercel.app"                  // Wildcard to trust all your preview URLs
         ));
         
-        // Explicitly authorize all communication methods
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        
-        // Allow all standard secure token request headers
         config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
         
-        // Apply this global policy routing across all your /api endpoints
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
     }
