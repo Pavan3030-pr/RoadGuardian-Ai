@@ -25,7 +25,6 @@ import com.roadguardian.backend.security.JwtAuthenticationFilter;
 import javax.crypto.SecretKey;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
@@ -37,21 +36,6 @@ public class SecurityConfig {
 
 	@Value("${app.jwt.expiration:86400000}")
 	private long jwtExpirationMs;
-
-	@Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,https://roadguardian.com,https://*.vercel.app,https://*.render.com}")
-	private String corsAllowedOrigins;
-
-	@Value("${app.cors.allowed-methods:GET,POST,PUT,DELETE,OPTIONS,PATCH}")
-	private String corsAllowedMethods;
-
-	@Value("${app.cors.allowed-headers:*}")
-	private String corsAllowedHeaders;
-
-	@Value("${app.cors.allow-credentials:true}")
-	private boolean corsAllowCredentials;
-
-	@Value("${app.cors.max-age:3600}")
-	private long corsMaxAge;
 
 	@Bean
 	public PasswordEncoder passwordEncoder() {
@@ -103,26 +87,24 @@ public class SecurityConfig {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
-		List<String> allowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
-				.map(String::trim)
-				.filter(origin -> !origin.isEmpty())
-				.collect(Collectors.toList());
+		
+		// 1. Enable secure cookie/header sharing
+		configuration.setAllowCredentials(true);
+		
+		// 2. Explicitly whitelist your direct project URLs and subdomains
+		configuration.setAllowedOriginPatterns(Arrays.asList(
+				"http://localhost:5173",
+				"https://road-guardian-ai.vercel.app",
+				"https://*.vercel.app"
+		));
 
-		List<String> allowedMethods = Arrays.stream(corsAllowedMethods.split(","))
-				.map(String::trim)
-				.filter(method -> !method.isEmpty())
-				.collect(Collectors.toList());
+		// 3. Authorize core communication request headers
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
-		List<String> allowedHeaders = Arrays.stream(corsAllowedHeaders.split(","))
-				.map(String::trim)
-				.filter(header -> !header.isEmpty())
-				.collect(Collectors.toList());
-
-		configuration.setAllowedOriginPatterns(allowedOrigins);
-		configuration.setAllowedMethods(allowedMethods);
-		configuration.setAllowedHeaders(allowedHeaders);
-		configuration.setAllowCredentials(corsAllowCredentials);
-		configuration.setMaxAge(corsMaxAge);
+		// 4. Accept common secure transmission parameters
+		configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control", "X-Requested-With"));
+		
+		configuration.setMaxAge(3600L);
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
