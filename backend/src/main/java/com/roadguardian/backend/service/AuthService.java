@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.roadguardian.backend.exception.InvalidRequestException;
+import com.roadguardian.backend.model.dto.request.ForgotPasswordRequest;
 import com.roadguardian.backend.exception.ResourceNotFoundException;
 import com.roadguardian.backend.model.dto.request.LoginRequest;
 import com.roadguardian.backend.model.dto.request.RegisterRequest;
@@ -158,6 +159,11 @@ public class AuthService {
 				.expiresIn(jwtExpiration)
 				.user(convertToUserResponse(user))
 				.build();
+	}
+
+	public void requestPasswordReset(ForgotPasswordRequest request) {
+		userRepository.findByEmailAndDeletedFalse(request.getEmail().trim().toLowerCase())
+				.ifPresent(user -> log.info("Password reset requested for user ID: {}", user.getId()));
 	}
 
 	public void logout(Long userId) {

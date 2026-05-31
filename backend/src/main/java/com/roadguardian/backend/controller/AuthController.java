@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.roadguardian.backend.model.dto.request.LoginRequest;
+import com.roadguardian.backend.model.dto.request.ForgotPasswordRequest;
 import com.roadguardian.backend.model.dto.request.RegisterRequest;
 import com.roadguardian.backend.model.dto.response.JwtAuthResponse;
 import com.roadguardian.backend.model.dto.response.ApiResponse;
@@ -44,6 +45,13 @@ public class AuthController {
 	public ResponseEntity<ApiResponse<JwtAuthResponse>> refreshToken(@RequestParam String refreshToken) {
 		JwtAuthResponse response = authService.refreshToken(refreshToken);
 		return ResponseEntity.ok(new ApiResponse<>(true, "Token refreshed successfully", response));
+	}
+
+	@PostMapping("/forgot-password")
+	@Operation(summary = "Request password reset", description = "Start password reset flow for an account")
+	public ResponseEntity<ApiResponse<String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+		authService.requestPasswordReset(request);
+		return ResponseEntity.ok(new ApiResponse<>(true, "If an account exists, reset instructions have been sent", ""));
 	}
 
 	@PostMapping("/logout")

@@ -12,6 +12,7 @@ const AIVision = lazy(() => import("./pages/AIVision"))
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"))
 const Login = lazy(() => import("./pages/Login"))
 const Register = lazy(() => import("./pages/Register"))
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"))
 const Reports = lazy(() => import("./pages/Reports"))
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/accident" element={<AccidentDetails />} />
                 <Route path="/vision" element={<PrivateRoute><AIVision /></PrivateRoute>} />
                 <Route path="/admin" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
